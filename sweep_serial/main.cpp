@@ -1,4 +1,6 @@
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <cmath>
 
 using namespace std;
@@ -13,20 +15,39 @@ void serialSweep(int n, double *a, double *c, double *b, double *f, double *p)
 {
     double m;
     for (int i = 1; i < n; i++) {
-        m = a[i]/c[i-1];
-        c[i] = c[i] - m*b[i-1];
-        f[i] = f[i] - m*f[i-1];
+        m = a[i] / c[i - 1];
+        c[i] = c[i] - m * b[i - 1];
+        f[i] = f[i] - m * f[i - 1];
     }
 
-    p[n-1] = f[n-1]/c[n-1];
+    p[n - 1] = f[n - 1] / c[n - 1];
 
     for (int i = n - 2; i >= 0; i--)
-        p[i]=(f[i]-b[i]*p[i+1])/c[i];
+        p[i]=( f[i] - b[i] * p[i + 1] ) / c[i];
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-    int gridSize = 100;
+    if (argc < 4) {
+        cout << "Input Error: too few arguments." << endl;
+        cout << "Usage: programm inputfile outputfile timefile" << endl;
+        return -1;
+    }
+    ifstream fileIn(argv[1]);
+    string input;
+    getline(fileIn, input);
+    istringstream iss(input);
+    int gridSize;
+    iss >> gridSize;
+    if (gridSize < 2) {
+        cout << "Input Error: grid size is wrong." << endl;
+        return -1;
+    }
+
+    string fileOutName = argv[2];
+    string fileTimeName = argv[3];
+    double time;
+
     double leftPoint = 1.;
     double rightPoint = 30.;
     double *subDiagonal = new double[gridSize - 1];
@@ -87,6 +108,15 @@ int main()
         }
     }
     cout << maxError;
+
+    double maxErrorD = 10; //TODO: implement this
+    time = 0.5; //TODO: implement this
+
+    ofstream fileOut(fileOutName.c_str());
+    fileOut << maxError << endl << maxErrorD;
+    ofstream fileTime(fileTimeName.c_str());
+    fileTime << time;
+
     return 0;
 }
 
