@@ -2,6 +2,9 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
+#include "timer.h"
+
+#define DEBUG 1
 
 using namespace std;
 
@@ -77,6 +80,9 @@ void blockSweep(int threadNumber, int n, double *a, double *c, double *b, double
 
 int main(int argc, char *argv[])
 {
+#if DEBUG
+    int gridSize = 100;
+#else
     if (argc < 4) {
         cout << "Input Error: too few arguments." << endl;
         cout << "Usage: programm inputfile outputfile timefile" << endl;
@@ -95,7 +101,7 @@ int main(int argc, char *argv[])
 
     string fileOutName = argv[2];
     string fileTimeName = argv[3];
-    double time;
+#endif
 
     double leftPoint = 1.;
     double rightPoint = 30.;
@@ -119,7 +125,13 @@ int main(int argc, char *argv[])
     }
     mainDiagonal[gridSize - 1] = 3./4;
     f[gridSize - 1] = (function(rightPoint) - function(rightPoint - h)) / h;
+
+    Timer timer;
+    timer.start();
+
     serialSweep(gridSize, subDiagonal, mainDiagonal, supDiagonal, f, p);
+
+    timer.stop();
 
     for (int j = 1; j < gridSize; ++j) {
         double xj = leftPoint + (j - 1) * h;
@@ -159,12 +171,15 @@ int main(int argc, char *argv[])
     cout << maxError;
 
     double maxErrorD = 10; //TODO: implement this
-    time = 0.5; //TODO: implement this
 
+#if DEBUG
+
+#else
     ofstream fileOut(fileOutName.c_str());
     fileOut << maxError << endl << maxErrorD;
     ofstream fileTime(fileTimeName.c_str());
-    fileTime << time;
+    fileTime << timer.getElapsed();
+#endif
 
     return 0;
 }

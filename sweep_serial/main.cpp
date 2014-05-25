@@ -4,6 +4,8 @@
 #include <cmath>
 #include "timer.h"
 
+#define DEBUG 1
+
 using namespace std;
 
 double function(double x)
@@ -33,8 +35,9 @@ void serialSweep(int n, double *a, double *c, double *b, double *f, double *p)
 
 int main(int argc, char *argv[])
 {
+#if DEBUG
     int gridSize = 100;
-
+#else
     if (argc < 4) {
         cout << "Input Error: too few arguments." << endl;
         cout << "Usage: programm inputfile outputfile timefile" << endl;
@@ -44,6 +47,7 @@ int main(int argc, char *argv[])
     string input;
     getline(fileIn, input);
     istringstream iss(input);
+    int gridSize;
     iss >> gridSize;
     if (gridSize < 2) {
         cout << "Input Error: grid size is wrong." << endl;
@@ -52,6 +56,7 @@ int main(int argc, char *argv[])
 
     string fileOutName = argv[2];
     string fileTimeName = argv[3];
+#endif
 
     double leftPoint = 1.;
     double rightPoint = 10.;
@@ -154,11 +159,14 @@ int main(int argc, char *argv[])
         }
     }
     //cout << maxErrorD<<endl;
+#if DEBUG
 
+#else
     ofstream fileOut(fileOutName.c_str());
     fileOut << maxError << endl << maxErrorD;
     ofstream fileTime(fileTimeName.c_str());
     fileTime << timer.getElapsed();
+#endif
 
     delete []subDiagonal;
     delete []supDiagonal;
