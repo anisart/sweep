@@ -2,13 +2,19 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
+#include "timer.h"
 
 using namespace std;
 
 double function(double x)
 {
-    return sin(x) / x;
-    //return x * x + 2 * x;
+    //return sin(x) / x;
+    return cos(x) / x;
+}
+
+double derFunction(double x)
+{
+    return (x * sin(x) + cos(x)) / (x * x);
 }
 
 void serialSweep(int n, double *a, double *c, double *b, double *f, double *p)
@@ -37,19 +43,22 @@ int main(int argc, char *argv[])
     string input;
     getline(fileIn, input);
     istringstream iss(input);
+
     int gridSize;
+
     iss >> gridSize;
     if (gridSize < 2) {
         cout << "Input Error: grid size is wrong." << endl;
         return -1;
     }
 
+
     string fileOutName = argv[2];
     string fileTimeName = argv[3];
-    double time;
 
     double leftPoint = 1.;
-    double rightPoint = 30.;
+    double rightPoint = 10.;
+
     double *subDiagonal = new double[gridSize - 1];
     double *supDiagonal = new double[gridSize - 1];
     double *mainDiagonal = new double[gridSize];
@@ -69,8 +78,14 @@ int main(int argc, char *argv[])
         f[i] = (function(leftPoint + (i + 1) * h) - function(leftPoint + i * h)) / h;
     }
     mainDiagonal[gridSize - 1] = 3./4;
-    f[gridSize - 1] = (function(rightPoint) - function(rightPoint - h)) / h;
+    f[gridSize - 1] = (function(rightPoint + h) - function(rightPoint)) / h;
+
+    Timer timer;
+    timer.start();
+
     serialSweep(gridSize, subDiagonal, mainDiagonal, supDiagonal, f, p);
+
+    timer.stop();
 
     for (int j = 1; j < gridSize; ++j) {
         double xj = leftPoint + (j - 1) * h;
@@ -82,40 +97,60 @@ int main(int argc, char *argv[])
     double *realFunc = new double[4 * gridSize + 1];
     double *splineFunc = new double[4 * gridSize + 1];
 
+    double *realFuncDer = new double[4 * gridSize + 1];
+    double *splineFuncDer = new double[4 * gridSize + 1];
+
+    double hDer = (double)h / 3.0;
     for (int i = 0; i < 4 * (gridSize - 1) + 1; ++i) {
-        realFunc[i] = function(leftPoint + (h * i) / 4);
+        double point = leftPoint + (h * i) / 4;
+        realFunc[i] = function(point);
+        realFuncDer[i] = derFunction(point);
     }
 
     for (int i = 0; i < (gridSize - 1); ++i) {
         double x = leftPoint + i * h;
         splineFunc[i * 4] = a[i] * x * x + b[i] * x + c[i];
+        splineFuncDer[i * 4] = a[i] * x + b[i];
         x += h / 4;
         splineFunc[i * 4 + 1] = a[i] * x * x + b[i] * x + c[i];
+        splineFuncDer[i * 4 + 1] = a[i] * x + b[i];
         x += h / 4;
         splineFunc[i * 4 + 2] = a[i] * x * x + b[i] * x + c[i];
+        splineFuncDer[i * 4 + 2] = a[i] * x + b[i];
         x += h / 4;
         splineFunc[i * 4 + 3] = a[i] * x * x + b[i] * x + c[i];
+        splineFuncDer[i * 4 + 3] = a[i] * x + b[i];
     }
     double x = rightPoint;
     splineFunc[(gridSize - 1) * 4] = a[gridSize - 2] * x * x + b[gridSize - 2] * x + c[gridSize - 2];
+    splineFuncDer[(gridSize - 1) * 4] = (a[gridSize - 2] * (x + hDer) * (x + hDer) + b[gridSize - 2] * (x + hDer) - (a[gridSize - 2] * (x - hDer) * (x - hDer) + b[gridSize - 2] * (x - hDer) )) / hDer;
 
     double maxError = 0.0;
     for (int i = 0; i < 4 * (gridSize - 1) + 1; ++i) {
-        cout << realFunc[i] << " " << splineFunc[i] << endl;
+        //cout << realFunc[i] << " " << splineFunc[i] << endl;
         double currError = abs(realFunc[i] - splineFunc[i]);
         if (currError > maxError) {
             maxError = currError;
         }
     }
-    cout << maxError;
+    //cout << maxError <<endl;
 
-    double maxErrorD = 10; //TODO: implement this
-    time = 0.5; //TODO: implement this
+    double maxErrorD = 0.0;
+    for (int i = 0; i < 4 * (gridSize - 1) + 1; ++i) {
+        //cout << realFuncDer[i] << " " << splineFuncDer[i] << endl;
+        double currErrorDer = abs(realFuncDer[i] - splineFuncDer[i]);
+        if (currErrorDer > maxErrorD) {
+            maxErrorD = currErrorDer;
+        }
+    }
+    //cout << maxErrorD<<endl;
+
+    //cout<<timer.getElapsed()<<endl;
 
     ofstream fileOut(fileOutName.c_str());
     fileOut << maxError << endl << maxErrorD;
     ofstream fileTime(fileTimeName.c_str());
-    fileTime << time;
+    fileTime << timer.getElapsed();
 
     return 0;
 }
