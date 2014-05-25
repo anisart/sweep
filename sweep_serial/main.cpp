@@ -8,7 +8,6 @@ using namespace std;
 
 double function(double x)
 {
-    //return sin(x) / x;
     return cos(x) / x;
 }
 
@@ -34,6 +33,8 @@ void serialSweep(int n, double *a, double *c, double *b, double *f, double *p)
 
 int main(int argc, char *argv[])
 {
+    int gridSize = 100;
+
     if (argc < 4) {
         cout << "Input Error: too few arguments." << endl;
         cout << "Usage: programm inputfile outputfile timefile" << endl;
@@ -43,15 +44,11 @@ int main(int argc, char *argv[])
     string input;
     getline(fileIn, input);
     istringstream iss(input);
-
-    int gridSize;
-
     iss >> gridSize;
     if (gridSize < 2) {
         cout << "Input Error: grid size is wrong." << endl;
         return -1;
     }
-
 
     string fileOutName = argv[2];
     string fileTimeName = argv[3];
@@ -64,21 +61,40 @@ int main(int argc, char *argv[])
     double *mainDiagonal = new double[gridSize];
     double *f = new double[gridSize];
 
-    double *a = new double[gridSize - 1];
-    double *b = new double[gridSize - 1];
-    double *c = new double[gridSize - 1];
-
     double *p = new double[gridSize];
 
     double h = (rightPoint - leftPoint) / (gridSize - 1);
     for (int i = 0; i < gridSize - 1; i ++) {
-        subDiagonal[i] = 1./8;
-        supDiagonal[i] = 1./8;
-        mainDiagonal[i] = 3./4;
-        f[i] = (function(leftPoint + (i + 1) * h) - function(leftPoint + i * h)) / h;
+        if (i == 0)
+        {
+            mainDiagonal[i] = 3./8 * h;//(h / 2);
+            subDiagonal[i] = 1./8 * h;//(h / 2);
+        }
+        else if (i == 1)
+        {
+            subDiagonal[i] = 1./8 * h;
+            supDiagonal[i - 1] = 1./8 * h;//(h / 2);
+            mainDiagonal[i] = 3./8 * 2 * h;//(h + (h / 2));
+        }
+        else
+        {
+            subDiagonal[i] = 1./8 * h;
+            supDiagonal[i - 1] = 1./8 * h;
+            mainDiagonal[i] = 3./8 * (h + h);
+        }
+        if (i == 0)
+        {
+            f[i] = (function(leftPoint + (h / 2)) - function(leftPoint));
+        }
+        else
+        {
+            f[i] = (function(leftPoint + (i + 1) * h - (h / 2)) - function(leftPoint + i * h - (h / 2)));
+        }
     }
-    mainDiagonal[gridSize - 1] = 3./4;
-    f[gridSize - 1] = (function(rightPoint + h) - function(rightPoint)) / h;
+    supDiagonal[gridSize - 2] = 1./8 * (h / 2);
+    mainDiagonal[gridSize - 1] = 3./8 * (h / 2);
+    f[gridSize - 1] = (function(rightPoint) - function(rightPoint - (h / 2)));
+
 
     Timer timer;
     timer.start();
@@ -87,20 +103,12 @@ int main(int argc, char *argv[])
 
     timer.stop();
 
-    for (int j = 1; j < gridSize; ++j) {
-        double xj = leftPoint + (j - 1) * h;
-        a[j - 1] = (p[j] - p[j - 1]) / (2 * h);
-        b[j - 1] = (xj / h) * (p[j - 1] - p[j]) + (p[j] + p[j - 1]) / 2;
-        c[j - 1] = function(xj) + ((p[j] - p[j - 1]) * xj * xj) / (2 * h) - (p[j] + p[j - 1]) / 2 * xj;
-    }
-
     double *realFunc = new double[4 * gridSize + 1];
     double *splineFunc = new double[4 * gridSize + 1];
 
     double *realFuncDer = new double[4 * gridSize + 1];
     double *splineFuncDer = new double[4 * gridSize + 1];
 
-    double hDer = (double)h / 3.0;
     for (int i = 0; i < 4 * (gridSize - 1) + 1; ++i) {
         double point = leftPoint + (h * i) / 4;
         realFunc[i] = function(point);
@@ -109,25 +117,27 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < (gridSize - 1); ++i) {
         double x = leftPoint + i * h;
-        splineFunc[i * 4] = a[i] * x * x + b[i] * x + c[i];
-        splineFuncDer[i * 4] = a[i] * x + b[i];
+        double piplus1 = leftPoint + (i + 1) * h - (h / 2);
+        double currH = h;
+        splineFuncDer[i * 4] = ((p[i + 1] + p[i]) / 2) + ((p[i + 1] + p[i]) * (x - piplus1) / currH);
+        splineFunc[i * 4] = function(piplus1) + ((p[i + 1] + p[i]) * (x - piplus1) / 2) + ((p[i + 1] - p[i]) * (x - piplus1) *  (x - piplus1) / (2 * currH));
         x += h / 4;
-        splineFunc[i * 4 + 1] = a[i] * x * x + b[i] * x + c[i];
-        splineFuncDer[i * 4 + 1] = a[i] * x + b[i];
+        splineFunc[i * 4 + 1] = function(piplus1) + ((p[i + 1] + p[i]) * (x - piplus1) / 2) + ((p[i + 1] - p[i]) * (x - piplus1) *  (x - piplus1) / (2 * currH));
+        splineFuncDer[i * 4 + 1] = ((p[i + 1] + p[i]) / 2) + ((p[i + 1] + p[i]) * (x - piplus1) / currH);
         x += h / 4;
-        splineFunc[i * 4 + 2] = a[i] * x * x + b[i] * x + c[i];
-        splineFuncDer[i * 4 + 2] = a[i] * x + b[i];
+        splineFunc[i * 4 + 2] = function(piplus1) + ((p[i + 1] + p[i]) * (x - piplus1) / 2) + ((p[i + 1] - p[i]) * (x - piplus1) *  (x - piplus1) / (2 * currH));
+        splineFuncDer[i * 4 + 2] = ((p[i + 1] + p[i]) / 2) + ((p[i + 1] + p[i]) * (x - piplus1) / currH);
         x += h / 4;
-        splineFunc[i * 4 + 3] = a[i] * x * x + b[i] * x + c[i];
-        splineFuncDer[i * 4 + 3] = a[i] * x + b[i];
+        splineFunc[i * 4 + 3] = function(piplus1) + ((p[i + 1] + p[i]) * (x - piplus1) / 2) + ((p[i + 1] - p[i]) * (x - piplus1) *  (x - piplus1) / (2 * currH));
+        splineFuncDer[i * 4 + 3] = ((p[i + 1] + p[i]) / 2) + ((p[i + 1] + p[i]) * (x - piplus1) / currH);
     }
     double x = rightPoint;
-    splineFunc[(gridSize - 1) * 4] = a[gridSize - 2] * x * x + b[gridSize - 2] * x + c[gridSize - 2];
-    splineFuncDer[(gridSize - 1) * 4] = (a[gridSize - 2] * (x + hDer) * (x + hDer) + b[gridSize - 2] * (x + hDer) - (a[gridSize - 2] * (x - hDer) * (x - hDer) + b[gridSize - 2] * (x - hDer) )) / hDer;
+    splineFunc[(gridSize - 1) * 4] = function(x);
+    splineFuncDer[(gridSize - 1) * 4] = p[gridSize];
 
     double maxError = 0.0;
     for (int i = 0; i < 4 * (gridSize - 1) + 1; ++i) {
-        //cout << realFunc[i] << " " << splineFunc[i] << endl;
+        cout << realFunc[i] << " " << splineFunc[i] << endl;
         double currError = abs(realFunc[i] - splineFunc[i]);
         if (currError > maxError) {
             maxError = currError;
@@ -145,12 +155,20 @@ int main(int argc, char *argv[])
     }
     //cout << maxErrorD<<endl;
 
-    //cout<<timer.getElapsed()<<endl;
-
     ofstream fileOut(fileOutName.c_str());
     fileOut << maxError << endl << maxErrorD;
     ofstream fileTime(fileTimeName.c_str());
     fileTime << timer.getElapsed();
+
+    delete []subDiagonal;
+    delete []supDiagonal;
+    delete []mainDiagonal;
+    delete []f;
+    delete []p;
+    delete []realFunc;
+    delete []realFuncDer;
+    delete []splineFunc;
+    delete []splineFuncDer;
 
     return 0;
 }
