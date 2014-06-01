@@ -5,7 +5,7 @@
 #include "timer.h"
 #include <omp.h>
 
-#define DEBUG 1
+#define DEBUG 0
 #define THREAD_COUNT 4
 
 using namespace std;
