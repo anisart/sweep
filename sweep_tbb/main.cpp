@@ -3,14 +3,13 @@
 #include <sstream>
 #include <cmath>
 #include "timer.h"
-//#include <time.h>
 
 #include "tbb/task_scheduler_init.h"
 #include "tbb/blocked_range.h"
 #include "tbb/parallel_for.h"
 #include "tbb/tick_count.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #define THREAD_COUNT 4
 #define GRAINSIZE    1
 
@@ -139,12 +138,10 @@ void doBackward(double *subDiagonal, double *mainDiagonal, double *supDiagonal, 
             if(blockRowIndex > blockStartRow){
                 subDiagonal[blockRowIndex - 2] -= subDiagonal[blockRowIndex - 1] * factor;
             }else{
-                // If we edit element out of block, we take element from main diagonal.
+                // If edit element out of block, take element from main diagonal
                 mainDiagonal[blockRowIndex - 1] -= subDiagonal[blockRowIndex - 1] * factor;
             }
         }
-
-        // Non-diagonal elements.
         supDiagonal[blockRowIndex - 1] = -supDiagonal[blockRowIndex] * factor;
         b[blockRowIndex - 1] -= b[blockRowIndex] * factor;
     }
@@ -243,8 +240,7 @@ void doCalculate(double *subDiagonal, double *mainDiagonal, double *supDiagonal,
     int blockStartRow = blockIndex * blockRowCount;
     int blockEndRow   = blockStartRow + blockRowCount - 1;
 
-    for(int blockRowIndex = blockStartRow; blockRowIndex < blockEndRow; blockRowIndex++)
-    {
+    for(int blockRowIndex = blockStartRow; blockRowIndex < blockEndRow; blockRowIndex++){
         x[blockRowIndex] = b[blockRowIndex];
 
         if(blockIndex > 0){
@@ -275,34 +271,16 @@ public:
     }
 };
 
-void solveTDM_Block(int equationCount,
-                      double* _subDiagonal, double* _mainDiagonal, double* _supDiagonal,
-                      double* _b,
-                      int blockCount,
-                      double* x)
+void tbbsweep(int equationCount,double* subDiagonal, double* mainDiagonal, double* supDiagonal,
+              double* b, int blockCount, double* x)
 {
-    if (equationCount % blockCount != 0)
-    {
-        cout<<"bad!"<<endl;
-    }
-    else
-    {
-        cout<<"!"<<endl;
-    }
+//    if (equationCount % blockCount != 0){
+//        cout<<"bad!"<<endl;
+//        break;
+//    }
 
     int blockRowCount = equationCount / blockCount;
-
-    int blockIndex;
-    int blockStartRow, blockEndRow;
-    int blockRowIndex;
-
-    double  factor;
     double* auxiliaryMatrix[5];
-
-    double *subDiagonal  = _subDiagonal;
-    double *mainDiagonal = _mainDiagonal;
-    double *supDiagonal  = _supDiagonal;
-    double *b			 = _b;
 
     parallel_for(blocked_range<int>(0, blockCount, GRAINSIZE), BlockForward(subDiagonal, mainDiagonal, supDiagonal, b, blockRowCount));
 
@@ -316,10 +294,7 @@ void solveTDM_Block(int equationCount,
 
     parallel_for(blocked_range<int>(0, blockCount, GRAINSIZE), BlockAuxilaryMatrix(subDiagonal, mainDiagonal, supDiagonal, b, blockRowCount, auxiliaryMatrix, blockCount));
 
-    serialSweep(blockCount,
-             auxiliaryMatrix[0], auxiliaryMatrix[1], auxiliaryMatrix[2],
-             auxiliaryMatrix[3],
-             auxiliaryMatrix[4]);
+    serialSweep(blockCount,auxiliaryMatrix[0], auxiliaryMatrix[1], auxiliaryMatrix[2], auxiliaryMatrix[3], auxiliaryMatrix[4]);
 
     parallel_for(blocked_range<int>(0, blockCount, GRAINSIZE), BlockX(auxiliaryMatrix[4], x, blockRowCount));
 
@@ -335,7 +310,7 @@ void solveTDM_Block(int equationCount,
 int main(int argc, char *argv[])
 {
 #if DEBUG
-    int gridSize = 10;
+    int gridSize = 100;
 #else
     if (argc < 4) {
         cout << "Input Error: too few arguments." << endl;
@@ -369,8 +344,6 @@ int main(int argc, char *argv[])
 
     int i = 0;
     double h = (rightPoint - leftPoint) / (gridSize - 1);
-    //double d = h * 0.9;
-    //double dOver2 = d / 2.0;
 
     double *knots = new double[gridSize];
     knots[0] = leftPoint;
@@ -381,12 +354,9 @@ int main(int argc, char *argv[])
     nodesX[0] = knots[0];
     nodesY[0] = function(nodesX[0]);
 
-    //srand((int)time(NULL));
-
     for (i = 1; i < gridSize - 1; i++)
     {
         knots[i] = i * h + leftPoint;
-        //knots[i] += (((double)rand() / RAND_MAX) * d) - dOver2;
 
         nodesX[i] = (knots[i] + knots[i - 1]) / 2;
         nodesY[i] = function(nodesX[i]);
@@ -398,7 +368,6 @@ int main(int argc, char *argv[])
 
     nodesX[gridSize] = knots[gridSize - 1];
     nodesY[gridSize] = function(nodesX[gridSize]);
-
 
     for (i = 1; i < gridSize - 1; i++)
     {
@@ -418,7 +387,7 @@ int main(int argc, char *argv[])
     Timer timer;
     timer.start();
     //serialSweep(gridSize, subDiagonal, mainDiagonal, supDiagonal, f, p);
-    solveTDM_Block(gridSize, subDiagonal, mainDiagonal, supDiagonal, f, THREAD_COUNT, p);
+    tbbsweep(gridSize, subDiagonal, mainDiagonal, supDiagonal, f, THREAD_COUNT, p);
 
     timer.stop();
 
@@ -447,20 +416,19 @@ int main(int argc, char *argv[])
             maxError = currError;
         }
     }
-    cout << maxError <<endl;
 
     double maxErrorD = 0.0;
     for (int i = 0; i < 4 * (gridSize - 1) + 1; ++i) {
-        //cout << realFuncDer[i] << " " << splineFuncDer[i] << endl;
         double currErrorDer = abs(realFuncDer[i] - splineFuncDer[i]);
         if (currErrorDer > maxErrorD) {
             maxErrorD = currErrorDer;
         }
     }
-    //cout << maxErrorD<<endl;
 #if DEBUG
-
+    cout << maxError <<endl;
+    cout << maxErrorD <<endl;
 #else
+    cout<<timer.getElapsed()<<endl;
     ofstream fileOut(fileOutName.c_str());
     fileOut << maxError << endl << maxErrorD;
     ofstream fileTime(fileTimeName.c_str());
